@@ -8,8 +8,6 @@ variables:
 
 build for production:
   stage: build
-  before_script:
-    - kubectl get cm ${DOCKER_APP_NAME}-production-yml -o jsonpath='{.data}' --namespace=production |  yq e -P | tail -n +2 | sed -r 's/^.{2}//' > config.yml
   script:
     - docker build --build-arg DOCKER_REGISTRY=${DOCKER_REGISTRY} -t ${DOCKER_REGISTRY}/${DOCKER_APP_NAME}:${CI_COMMIT_SHORT_SHA} .
     - docker push ${DOCKER_REGISTRY}/${DOCKER_APP_NAME}:${CI_COMMIT_SHORT_SHA}
