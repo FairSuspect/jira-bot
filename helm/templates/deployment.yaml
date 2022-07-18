@@ -1,0 +1,58 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.env }}
+spec:
+  minReadySeconds: 20
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote }}
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: {{ .Release.Name }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-{{ .Values.env }}-yml
+          resources:
+            requests:
+              cpu: 100m
+          terminationMessagePolicy: FallbackToLogsOnError
+
+{{- if eq (.Values.env) "enabled" }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-get-code
+  namespace: {{ .Values.env }}
+spec:
+  suspend: {{ .Values.suspend }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-job
+    spec:
+      containers:
+          - name: {{ .Release.Name }}
+            image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+            imagePullPolicy: {{ .Values.image.pullPolicy }}
+            command: ["/bin/sh", "-c"]
+            args:
+              - /app/jira-work
+            envFrom:
+              - configMapRef:
+                  name: {{ .Release.Name }}-{{ .Values.env }}-yml
+      restartPolicy: Never
+
+{{- end }}
