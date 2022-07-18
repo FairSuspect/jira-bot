@@ -20,5 +20,5 @@ deploy:
   needs: [ "build" ]
   script:
     - curl -H "X-Vault-Token:${VAULT_TOKEN}" ${VAULT_ADDR} | jq -r '.data.data | keys[] as $key | "\($key)=\(.[$key])"' > ~/tmp_env/${DOCKER_APP_NAME}-${NAMESPACE}-env.yaml
-    - kubectl create cm ${DOCKER_APP_NAME}-${NAMESPACE}-env --namespace ${NAMESPACE} --from-env-file ~/tmp_env//${DOCKER_APP_NAME}-${NAMESPACE}-env.yaml --dry-run=client -o yaml | kubectl apply -f - && rm ~/tmp_env/${DOCKER_APP_NAME}-${NAMESPACE}-env.yaml
+    - kubectl create cm ${DOCKER_APP_NAME}-${NAMESPACE}-yaml --namespace ${NAMESPACE} --from-env-file ~/tmp_env//${DOCKER_APP_NAME}-${NAMESPACE}-env.yaml --dry-run=client -o yaml | kubectl apply -f - && rm ~/tmp_env/${DOCKER_APP_NAME}-${NAMESPACE}-env.yaml
     - helm upgrade --install --atomic --timeout 5m --namespace=${NAMESPACE} --set image.tag=${CI_COMMIT_SHORT_SHA} --set env=${NAMESPACE} ${DOCKER_APP_NAME} ./helm --debug
