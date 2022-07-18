@@ -18,8 +18,9 @@ import (
 
 func main() {
 
-	// Load Env variables from .dot file
-	godotenv.Load(".env")
+	if _, err := os.Stat(".env"); err == nil {
+		godotenv.Load(".env")
+	}
 
 	token := os.Getenv("SLACK_AUTH_TOKEN")
 	appToken := os.Getenv("SLACK_APP_TOKEN")

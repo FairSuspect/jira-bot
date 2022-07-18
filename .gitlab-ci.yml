@@ -5,17 +5,20 @@ stages:
 variables:
   DOCKER_REGISTRY: 900461047507.dkr.ecr.eu-central-1.amazonaws.com
   DOCKER_APP_NAME: jira-work
+  NAMESPACE: tools
 
-build for production:
+build :
   stage: build
   script:
+    - curl -H "X-Vault-Token:${VAULT_TOKEN}" ${VAULT_ADDR} | jq -r '.data.data | keys[] as $key | "\($key)=\(.[$key])"' > ~/tmp_env/${DOCKER_APP_NAME}-${NAMESPACE}-env.yaml
+    - kubectl create cm ${DOCKER_APP_NAME}-${NAMESPACE}-env --namespace ${NAMESPACE} --from-env-file ~/tmp_env//${DOCKER_APP_NAME}-${NAMESPACE}-env.yaml --dry-run=client -o yaml | kubectl apply -f - && rm ~/tmp_env/${DOCKER_APP_NAME}-${NAMESPACE}-env.yaml
     - docker build --build-arg DOCKER_REGISTRY=${DOCKER_REGISTRY} -t ${DOCKER_REGISTRY}/${DOCKER_APP_NAME}:${CI_COMMIT_SHORT_SHA} .
     - docker push ${DOCKER_REGISTRY}/${DOCKER_APP_NAME}:${CI_COMMIT_SHORT_SHA}
   rules:
     - when: manual
 
-deploy to production:
+deploy:
   stage: deploy
-  needs: [ "build for production" ]
+  needs: [ "build" ]
   script:
-    - helm upgrade --install --atomic --timeout 5m --namespace=production --set image.tag=${CI_COMMIT_SHORT_SHA} --set env=production ${DOCKER_APP_NAME} ./helm --debug
+    - helm upgrade --install --atomic --timeout 5m --namespace=production --set image.tag=${CI_COMMIT_SHORT_SHA} --set env=${NAMESPACE} ${DOCKER_APP_NAME} ./helm --debug
