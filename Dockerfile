@@ -16,7 +16,4 @@ FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 
 COPY --from=builder /usr/src/app/dist/jira-work /app/jira-work
-RUN mkdir -p /etc/jira-work
-
-EXPOSE 8080
 ENTRYPOINT ["/app/jira-work"]
