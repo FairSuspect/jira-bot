@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -66,34 +67,29 @@ func main() {
 
 				// Обработка слэш команд
 				case socketmode.EventTypeSlashCommand:
-
 					eventMessage, ok := event.Data.(slack.SlashCommand)
 					if !ok {
 						log.Printf("Could not type cast the event to the MessageEvent: %v\n", event)
 						postMessage("Внутренняя ошибка бота", client, channelID)
 						continue
 					}
-
-					Arguments := strings.Split(eventMessage.Text, " ")
-
-					UserName := Arguments[0]
-					if UserName[0] != '@' {
-						postMessage("Команда работает только с упоминанием пользователя", client, channelID)
-						socketClient.Ack(*event.Request)
-						continue
-					}
-					UserName = UserName[1:]
-
-					slackUser := slack_int.FindSlackUser(&UserName, &slackUsers)
-
-					pageSize := 10
-					if len(Arguments) > 1 {
-						pageSize, err = strconv.Atoi(Arguments[1])
+					channelID = eventMessage.ChannelID
+					var UserName string
+					if len(eventMessage.Text) == 0 {
+						UserName = eventMessage.UserName
+					} else {
+						UserName, err = parseUserNameFromFirstArgument(eventMessage)
 						if err != nil {
-							postMessage("Неверный второй аргумент. Должно быть число.\n "+err.Error(), client, channelID)
+							postMessage(err.Error(), client, channelID)
+							socketClient.Ack(*event.Request)
+							continue
 						}
-
+						UserName = UserName[1:]
 					}
+					var slackUser *slack.User
+					slackUser = slack_int.FindSlackUser(&UserName, &slackUsers)
+
+					const pageSize int = 1000
 
 					var jiraUser jira.User
 
@@ -104,6 +100,15 @@ func main() {
 							jiraUser = User
 						}
 					}
+					// var senderJiraUser jira.User
+
+					// for _, User := range atlassianUsers {
+
+					// 	// log.Println(strings.ToLower(slackUser.RealName) + " : " + strings.ToLower(User.DisplayName) + " or " + UserName + " : " + strings.ToLower(User.Name))
+					// 	if strings.ToLower(slackUser.RealName) == strings.ToLower(User.DisplayName) || UserName == strings.ToLower(User.Name) {
+					// 		jiraUser = User
+					// 	}
+					// }
 
 					if jiraUser.DisplayName == "" {
 						postMessage("Пользователь "+slackUser.RealName+" не найден.", client, channelID)
@@ -133,17 +138,54 @@ func main() {
 							continue
 						}
 						message = "Задачи, взятые в работу пользователем " + slackUser.RealName + ": \n"
+
+					case "/j":
+						issues = jira_int.GetIssuesInJobByAssignee(jiraUser, pageSize)
+						if len(issues) == 0 {
+
+							postMessage("У пользователя "+slackUser.RealName+" нет взятых задач в работу", client, channelID)
+							socketClient.Ack(*event.Request)
+							continue
+						}
+						message = "Задачи, взятые в работу пользователем " + slackUser.RealName + ": \n"
+
+					case "/report":
+						issues = jira_int.GetIssuesByReporter(jiraUser, pageSize)
+						if len(issues) == 0 {
+
+							postMessage("Задачи, созданные пользователем "+slackUser.RealName+", не найдены", client, channelID)
+							socketClient.Ack(*event.Request)
+							continue
+						}
+						message = "Задачи, созданные пользователем " + slackUser.RealName + " (" + strconv.Itoa(len(issues)) + "): \n"
+					case "/help":
+						postMessage(helpMessage, client, channelID)
+						socketClient.Ack(*event.Request)
+						continue
 					}
+
 					var issueLinks []string
 					for _, issue := range issues {
-						issueLinks = append(issueLinks, "https://ecos.atlassian.net/browse/"+issue.Key)
+						// const limit int = 51
+						var issueSummary string
+						// if len(issue.Fields.Summary) > limit {
+						// 	issueSummary = issue.Fields.Summary[0:limit] + "..."
+						// } else {
+
+						issueSummary = issue.Fields.Summary
+						// }
+						issueLinks = append(issueLinks, "\t•\t"+issueSummary+" [<https://ecos.atlassian.net/browse/"+issue.Key+"|"+issue.Key+">]\t-\t["+issue.Fields.Status.Name+"]")
 					}
 					log.Println(issueLinks)
 
-					for _, link := range issueLinks {
-						message += ("\n" + link)
+					for i, link := range issueLinks {
+						message += (link + "\n")
+						if i%10 == 9 {
+							postMessage(message, client, eventMessage.ChannelID)
+							message = " "
+						}
 					}
-					postMessage(message, client, channelID)
+					postMessage(message, client, eventMessage.ChannelID)
 					socketClient.Ack(*event.Request)
 				}
 			}
@@ -152,6 +194,17 @@ func main() {
 
 	socketClient.Run()
 	ctx.Done()
+}
+
+func parseUserNameFromFirstArgument(eventMessage slack.SlashCommand) (string, error) {
+	Arguments := strings.Split(eventMessage.Text, " ")
+
+	UserName := Arguments[0]
+	if UserName[0] != '@' {
+		return "", errors.New("Команда работает только с упоминанием пользователя")
+
+	}
+	return UserName, nil
 }
 
 func postMessage(message string, client *slack.Client, channelID string) {
@@ -167,3 +220,8 @@ func postMessage(message string, client *slack.Client, channelID string) {
 	}
 	log.Printf("Message sent at %s", timestamp)
 }
+
+const helpMessage string = `Команды
+- /job @UserName - поиск задач в статусе 'В разработке' исполнителя @UserName
+- /base @UserName - поиск задач в статус 'Бэклог' и 'Подлежит разработке' исполнителя @UserName
+- /report @UserName - поиск задач, созданных пользователем @UserName`

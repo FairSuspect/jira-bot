@@ -92,6 +92,25 @@ func GetIssuesInJobByAssignee(assignee jira.User, pageSize int) []jira.Issue {
 	return issues
 }
 
+// Возвращает задачи, созданные пользователем
+func GetIssuesByReporter(reporter jira.User, pageSize int) []jira.Issue {
+	godotenv.Load(".env")
+	// Create a BasicAuth Transport object
+	tp := jira.BasicAuthTransport{
+		Username: os.Getenv("JIRA_USER"),
+		Password: os.Getenv("JIRA_TOKEN"),
+	}
+	// Create a new Jira Client
+	client, err := jira.NewClient(tp.Client(), os.Getenv("JIRA_URL"))
+	jql := "project = 'ITP' AND reporter = " + reporter.AccountID + " ORDER BY created DESC"
+
+	issues, err := GetAllIssues(client, jql, pageSize, 0)
+	if err != nil {
+		log.Printf(err.Error())
+	}
+	return issues
+}
+
 // Возвращает задачи пользователя в статус "Бэклог" и "Подлежит разработке"
 func GetIssuesInBackByAssignee(assignee jira.User, pageSize int) []jira.Issue {
 	godotenv.Load(".env")
