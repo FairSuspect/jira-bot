@@ -23,4 +23,4 @@ go.work
 __debug_bin
 
 *.vscode
-.env
+*.env

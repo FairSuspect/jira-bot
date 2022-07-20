@@ -17,6 +17,12 @@ import (
 	"github.com/slack-go/slack/socketmode"
 )
 
+const baseCommand string = "/base"
+const jobCommand string = "/job"
+const jCommand string = "/j"
+const reportCommand string = "/report"
+const bugCommand string = "/bug"
+
 func main() {
 
 	if _, err := os.Stat(".env"); err == nil {
@@ -89,7 +95,7 @@ func main() {
 					var slackUser *slack.User
 					slackUser = slack_int.FindSlackUser(&UserName, &slackUsers)
 
-					const pageSize int = 1000
+					var pageSize int = 1000
 
 					var jiraUser jira.User
 
@@ -120,7 +126,7 @@ func main() {
 					var message string = ""
 					switch eventMessage.Command {
 
-					case "/base":
+					case baseCommand:
 						issues = jira_int.GetIssuesInBackByAssignee(jiraUser, pageSize)
 						if len(issues) == 0 {
 
@@ -129,7 +135,7 @@ func main() {
 							continue
 						}
 						message = "Задачи из бэклога пользователя " + slackUser.RealName + ": \n"
-					case "/job":
+					case jobCommand:
 						issues = jira_int.GetIssuesInJobByAssignee(jiraUser, pageSize)
 						if len(issues) == 0 {
 
@@ -139,7 +145,7 @@ func main() {
 						}
 						message = "Задачи, взятые в работу пользователем " + slackUser.RealName + ": \n"
 
-					case "/j":
+					case jCommand:
 						issues = jira_int.GetIssuesInJobByAssignee(jiraUser, pageSize)
 						if len(issues) == 0 {
 
@@ -149,7 +155,8 @@ func main() {
 						}
 						message = "Задачи, взятые в работу пользователем " + slackUser.RealName + ": \n"
 
-					case "/report":
+					case reportCommand:
+						pageSize = 10
 						issues = jira_int.GetIssuesByReporter(jiraUser, pageSize)
 						if len(issues) == 0 {
 
@@ -158,10 +165,22 @@ func main() {
 							continue
 						}
 						message = "Задачи, созданные пользователем " + slackUser.RealName + " (" + strconv.Itoa(len(issues)) + "): \n"
+					case bugCommand:
+						pageSize = 10
+						issues = jira_int.GetBugsByAssignee(jiraUser, pageSize)
+						if len(issues) == 0 {
+
+							postMessage("Нерешённые баги, назначенные напользователя "+slackUser.RealName+", не найдены", client, channelID)
+							socketClient.Ack(*event.Request)
+							continue
+						}
+						message = "Нерешённые баги, назначенные на пользователя " + slackUser.RealName + " (" + strconv.Itoa(len(issues)) + "): \n"
 					case "/help":
 						postMessage(helpMessage, client, channelID)
 						socketClient.Ack(*event.Request)
 						continue
+					default:
+						message = "Команда '" + eventMessage.Command + "' не обработана. Свяжитесь с разработчиком приложения"
 					}
 
 					var issueLinks []string

@@ -130,7 +130,26 @@ func GetIssuesInBackByAssignee(assignee jira.User, pageSize int) []jira.Issue {
 	return issues
 }
 
-// Возвращает все задачи по JQL запросу `seatchString`
+// Возвращает баги пользователя в категориях статуса "В работе" и "Новые"
+func GetBugsByAssignee(assignee jira.User, pageSize int) []jira.Issue {
+	godotenv.Load(".env")
+	// Create a BasicAuth Transport object
+	tp := jira.BasicAuthTransport{
+		Username: os.Getenv("JIRA_USER"),
+		Password: os.Getenv("JIRA_TOKEN"),
+	}
+	// Create a new Jira Client
+	client, err := jira.NewClient(tp.Client(), os.Getenv("JIRA_URL"))
+	jql := "project = 'ITP' AND type = 'Баг ITP' AND statuscategory IN ('In Progress','New') AND assignee = " + assignee.AccountID + " ORDER BY created DESC"
+
+	issues, err := GetAllIssues(client, jql, pageSize, 0)
+	if err != nil {
+		log.Printf(err.Error())
+	}
+	return issues
+}
+
+// Возвращает все задачи по JQL запросу `searchString`
 func GetAllIssues(client *jira.Client, searchString string, MaxResults int, StartAt int) ([]jira.Issue, error) {
 
 	var issues []jira.Issue
