@@ -102,7 +102,7 @@ func GetIssuesByReporter(reporter jira.User, pageSize int) []jira.Issue {
 	}
 	// Create a new Jira Client
 	client, err := jira.NewClient(tp.Client(), os.Getenv("JIRA_URL"))
-	jql := "project = 'ITP' AND reporter = " + reporter.AccountID + " ORDER BY created DESC"
+	jql := "project = 'ITP' AND reporter = " + reporter.AccountID + " AND statuscategory IN ('In Progress','New') ORDER BY created DESC"
 
 	issues, err := GetAllIssues(client, jql, pageSize, 0)
 	if err != nil {
