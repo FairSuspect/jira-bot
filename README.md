@@ -1,4 +1,6 @@
-Slack бот, парсящий Jira на предмет задач
+Slack бот, получающий список задач из Jira для Slack пользователей.
+
+Сопоставление пользователей выполняется по их username.
 
 ## Инструкция по развёртыванию
  - Создать файл .env со следующими полями:
@@ -7,7 +9,7 @@ Slack бот, парсящий Jira на предмет задач
     + SLACK_CHANNEL_ID="channel id(публичный)"
     + JIRA_USER="email пользователя jira"
     + JIRA_TOKEN="приватный api токен пользователя jira"
-    + JIRA_URL="https://ecos.atlassian.net"
+    + JIRA_URL="jira URL"
  - go install
  - go run main.go
 
